@@ -192,9 +192,9 @@ class MyGame(arcade.Window):
             self.player_sprite.steering = 0
 
         # Update speed and angle based on throttle, brake and steering
-        self.player_sprite.angle += self.player_sprite.steering / (self.player_sprite.speed/3 if self.player_sprite.speed/3 > 1 else 1 / 3)
+        self.player_sprite.angle += (self.player_sprite.steering / (self.player_sprite.speed/3 if self.player_sprite.speed/3 > 1 else 1/3)) if self.player_sprite.speed > 0.5 else self.player_sprite.steering * self.player_sprite.speed * 7
         self.player_sprite.speed += self.player_sprite.throttle * (1/15)
-        self.player_sprite.speed -= self.player_sprite.brake * (1/9 if self.player_sprite.speed > 1/9 else 0)
+        self.player_sprite.speed -= (self.player_sprite.brake * 1/14) if self.player_sprite.speed > 1/9 else self.player_sprite.speed if self.player_sprite.brake > 0 else 0
         self.player_sprite.speed *= 0.99
         
         # Update player based on speed and angle
@@ -203,6 +203,9 @@ class MyGame(arcade.Window):
         self.position = arcade.rotate_point(
             self.player_sprite.center_x, self.player_sprite.center_y,
             self.player_sprite.center_x, self.player_sprite.center_y, self.player_sprite.angle)
+        
+        # Update angle to keep within bounds
+        self.player_sprite.angle += -360 if self.player_sprite.angle > 360 else +360 if self.player_sprite.angle < 0 else 0
 
         # Call update on all sprites (The sprites don't do much in this
         # example though.)

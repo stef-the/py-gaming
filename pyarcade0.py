@@ -53,6 +53,8 @@ class MyGame(arcade.Window):
         self.right_pressed = False
         self.up_pressed = False
         self.down_pressed = False
+        self.shift_up_pressed = False
+        self.shift_down_pressed = False
 
         # Create the cameras. One for the GUI, one for the sprites.
         # We scroll the 'sprite world' but not the GUI.
@@ -124,7 +126,7 @@ class MyGame(arcade.Window):
                                      arcade.color.GRAY)
         text = f"Coords: ({self.camera_sprites.position[0]:5.1f}, {self.camera_sprites.position[1]:5.1f}) | " \
             f"Speed: {self.player_sprite.speed:5.1f} | " \
-            f"Gear: {self.player_sprite.gear} | " \
+            f"Gear: {self.player_sprite.gear if self.player_sprite.gear > 0 else 'N' if self.player_sprite.gear == 0 else f'R{abs(self.player_sprite.gear)}'} | " \
             f"Throttle: {self.player_sprite.throttle} | " \
             f"Brake: {self.player_sprite.brake} | " \
             f"Angle: {self.player_sprite.angle:5.1f} | " \
@@ -145,8 +147,10 @@ class MyGame(arcade.Window):
             self.right_pressed = True
         elif key == arcade.key.Q:
             self.shift_down_pressed = True
+            self.player_sprite.gear -= 1
         elif key == arcade.key.E:
             self.shift_up_pressed = True
+            self.player_sprite.gear += 1
 
     def on_key_release(self, key, modifiers):
         """Called when the user releases a key. """
@@ -190,7 +194,7 @@ class MyGame(arcade.Window):
         # Update speed and angle based on throttle, brake and steering
         self.player_sprite.angle += self.player_sprite.steering / (self.player_sprite.speed/3 if self.player_sprite.speed/3 > 1 else 1 / 3)
         self.player_sprite.speed += self.player_sprite.throttle * (1/15)
-        self.player_sprite.speed -= self.player_sprite.brake * (1/9 if self.player_sprite.speed > 0 else 1/30)
+        self.player_sprite.speed -= self.player_sprite.brake * (1/9 if self.player_sprite.speed > 1/9 else 0)
         self.player_sprite.speed *= 0.99
         
         # Update player based on speed and angle

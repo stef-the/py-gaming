@@ -31,7 +31,6 @@ def pad_with_zeros(buf, num_zeros):
 
 def normalize_volume(buf, loudest_sample=None):
     '''Makes the loudest sample in the buffer use the max_16bit volume. No clipping'''
-    print(loudest_sample, buf)
     buf *= np.int32((cfg.max_16bit / (loudest_sample or find_loudest_sample(buf))) or 750)
 
 def exponential_volume_dropoff(buf, duration, base):

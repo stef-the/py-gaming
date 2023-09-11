@@ -12,6 +12,8 @@ import arcade
 import math
 import time
 from pyglet.math import Vec2
+import engine_sound_sim.engine_factory
+from multiprocessing import Process
 
 SPRITE_SCALING = 0.5
 
@@ -21,15 +23,15 @@ SCREEN_TITLE = "Sprite Move with Scrolling Screen Example"
 
 # How many pixels to keep as a minimum margin between the character
 # and the edge of the screen.
-VIEWPORT_MARGIN = 220
+VIEWPORT_MARGIN = 300
 
 # How fast the camera pans to the player. 1.0 is instant.
-CAMERA_SPEED = 0.1
+CAMERA_SPEED = 0.3
 
 # How fast the character moves
 PLAYER_MOVEMENT_SPEED = 7
-
-
+BASE_REVS = 750
+REVS = 0
 class MyGame(arcade.Window):
     """Main application class."""
 
@@ -135,7 +137,7 @@ class MyGame(arcade.Window):
             f"Brake: {self.player_sprite.brake} | "
             f"Angle: {self.player_sprite.angle:5.1f} | "
             f"Steering: {self.player_sprite.steering} | "
-            f"Rev: {(self.player_sprite.speed / (self.player_sprite.gear * (1.9 - self.player_sprite.gear * 0.05))) if self.player_sprite.gear != 0 else 0}"
+            f"RPM: {round((self.player_sprite.speed / (abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1))) if self.player_sprite.gear != 0 else self.player_sprite.throttle, 3) * 14250 + 750}"
         )
 
         arcade.draw_text(text, 10, 10, arcade.color.BLACK, 20)
@@ -203,16 +205,17 @@ class MyGame(arcade.Window):
             (
                 self.player_sprite.steering
                 / (
-                    self.player_sprite.speed / 3
-                    if self.player_sprite.speed / 3 > 1
+                    abs(self.player_sprite.speed) / 3
+                    if abs(self.player_sprite.speed) / 3 > 1
                     else 1 / 3
                 )
             )
-            if self.player_sprite.speed > 0.5
-            else self.player_sprite.steering * self.player_sprite.speed * 7
+            if abs(self.player_sprite.speed) > 0.5
+            else self.player_sprite.steering * abs(self.player_sprite.speed) * 7
         )
 
         # Update speed based on throttle & gear
+        REVS = round((self.player_sprite.speed / (abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1))) if self.player_sprite.gear != 0 else self.player_sprite.throttle, 3)
         self.player_sprite.speed += (
             (
                 self.player_sprite.throttle
@@ -225,16 +228,16 @@ class MyGame(arcade.Window):
                     )
                 )
                 * 1
-                if self.player_sprite.gear > 0
-                else self.player_sprite.gear
+                if abs(self.player_sprite.gear) > 0
+                else 0
             )
             if abs(self.player_sprite.speed)
-            < abs(self.player_sprite.gear) * (1.9 - abs(self.player_sprite.gear) * 0.05)
+            < abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1)
             else 0
         )
 
         # Update speed based on gear (removing acceleration at higher gears)
-        self.player_sprite.speed *= 1 - self.player_sprite.gear * 0.000008
+        self.player_sprite.speed *= 1 - self.player_sprite.gear * 0.000003
         self.player_sprite.speed -= (
             (self.player_sprite.brake * 1 / 14)
             if self.player_sprite.speed > 1 / 9
@@ -242,7 +245,9 @@ class MyGame(arcade.Window):
             if self.player_sprite.brake > 0
             else 0
         )
-        if self.player_sprite.throttle < 1:
+
+        # Add resistance when not
+        if self.player_sprite.throttle < 1 or abs(self.player_sprite.speed) > abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1):
             self.player_sprite.speed *= 0.995
 
         # Update player based on speed and angle

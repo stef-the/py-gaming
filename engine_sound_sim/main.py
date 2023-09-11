@@ -24,8 +24,7 @@ print('\nEngine is running...')
 # print(rando)
 
 try:
-    while True:
-        time.sleep(0.02)
+    controls.capture_input(engine)  # blocks until user exits
 except KeyboardInterrupt:
     pass
 

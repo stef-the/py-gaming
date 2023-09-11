@@ -1,4 +1,4 @@
-import cfg
+from engine_sound_sim import cfg
 
 import pyaudio
 

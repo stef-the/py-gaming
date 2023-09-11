@@ -1,0 +1,5 @@
+numpy
+pynput
+pyaudio
+arcade
+pyglet

@@ -12,8 +12,11 @@ import arcade
 import math
 import time
 from pyglet.math import Vec2
+from pynput import keyboard
 import engine_sound_sim.engine_factory
+from engine_sound_sim.audio_device import AudioDevice
 from multiprocessing import Process
+import threading
 
 SPRITE_SCALING = 0.5
 
@@ -32,6 +35,27 @@ CAMERA_SPEED = 0.3
 PLAYER_MOVEMENT_SPEED = 7
 BASE_REVS = 750
 REVS = 0
+RUNNING = True
+
+class _BlockingInputThread(threading.Thread):
+    '''
+    The `inputs` library's IO is blocking, which means a new thread is needed to wait for
+    events to avoid blocking the program when no inputs are received.
+    '''
+    def __init__(self, lock):
+        super(_BlockingInputThread, self).__init__(daemon=True)
+        self.lock = lock
+        self.space_held = False
+    def on_press(self, key):
+        self.space_held = True
+    def on_release(self, key):
+        self.space_held = False
+    def run(self):
+        listener = keyboard.Listener(
+            on_press=self.on_press,
+            on_release=self.on_release)
+        listener.start()
+
 class MyGame(arcade.Window):
     """Main application class."""
 
@@ -66,6 +90,10 @@ class MyGame(arcade.Window):
         self.camera_sprites = arcade.Camera(DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT)
         self.camera_gui = arcade.Camera(DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT)
 
+        self.engine = None
+        self.lock = None
+        self.blockingInputThread = None
+
     def setup(self):
         """Set up the game and initialize the variables."""
 
@@ -74,7 +102,7 @@ class MyGame(arcade.Window):
         self.wall_list = arcade.SpriteList()
 
         # Set up the player
-        self.player_sprite = arcade.Sprite("img/red_car/straight.png", scale=0.4)
+        self.player_sprite = arcade.Sprite("./img/red_car/straight.png", scale=0.4)
         self.player_sprite.center_x = 256
         self.player_sprite.center_y = 512
 
@@ -108,6 +136,15 @@ class MyGame(arcade.Window):
 
         # Set the background color
         arcade.set_background_color(arcade.color.AMAZON)
+
+        self.engine = engine_sound_sim.engine_factory.formula_one_test()
+        print('engine sound processor on')
+        self.lock = threading.Lock()
+        self.blockingInputThread = _BlockingInputThread(self.lock)
+        self.blockingInputThread.start()
+
+        self.audio_device = AudioDevice()
+        self.stream = self.audio_device.play_stream(self.engine.gen_audio)
 
     def on_draw(self):
         """Render the screen."""
@@ -206,16 +243,28 @@ class MyGame(arcade.Window):
                 self.player_sprite.steering
                 / (
                     abs(self.player_sprite.speed) / 3
-                    if abs(self.player_sprite.speed) / 3 > 1
-                    else 1 / 3
+                    if abs(self.player_sprite.speed) > 1/3
+                    else 1/3
                 )
             )
             if abs(self.player_sprite.speed) > 0.5
             else self.player_sprite.steering * abs(self.player_sprite.speed) * 7
         )
 
+        # Update sound based on throttle & gear
+        self.engine.specific_rpm(abs(round(
+            ((
+                self.player_sprite.speed
+                / (
+                    abs(self.player_sprite.gear)
+                    * (1.5 + abs(self.player_sprite.gear) * 0.1)
+                )
+            )
+            if self.player_sprite.gear != 0
+            else self.player_sprite.throttle) * 12000 + 750,
+        ) or 750))
+
         # Update speed based on throttle & gear
-        REVS = round((self.player_sprite.speed / (abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1))) if self.player_sprite.gear != 0 else self.player_sprite.throttle, 3)
         self.player_sprite.speed += (
             (
                 self.player_sprite.throttle
@@ -235,19 +284,23 @@ class MyGame(arcade.Window):
             < abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1)
             else 0
         )
+        if abs(self.player_sprite.speed) > abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1):
+            self.player_sprite.speed -= abs(self.player_sprite.speed) - abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1) + 0.03
 
         # Update speed based on gear (removing acceleration at higher gears)
         self.player_sprite.speed *= 1 - self.player_sprite.gear * 0.000003
         self.player_sprite.speed -= (
-            (self.player_sprite.brake * 1 / 14)
+            (self.player_sprite.brake * 1 / 30)
             if self.player_sprite.speed > 1 / 9
             else self.player_sprite.speed
             if self.player_sprite.brake > 0
             else 0
         )
 
-        # Add resistance when not
-        if self.player_sprite.throttle < 1 or abs(self.player_sprite.speed) > abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1):
+        # Add resistance when not throttleing
+        if self.player_sprite.throttle == 0 or abs(self.player_sprite.speed) > abs(
+            self.player_sprite.gear
+        ) * (1.5 + abs(self.player_sprite.gear) * 0.1):
             self.player_sprite.speed *= 0.995
 
         # Update player based on speed and angle
@@ -304,11 +357,28 @@ class MyGame(arcade.Window):
         self.camera_gui.resize(int(width), int(height))
 
 
-def main():
-    """Main function"""
+def game_engine_processor():
     window = MyGame(DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT, SCREEN_TITLE)
     window.setup()
     arcade.run()
+
+def engine_sound_processor():
+    engine = engine_sound_sim.engine_factory.formula_one_test()
+    print('engine sound processor on')
+    lock = threading.Lock()
+    blockingInputThread = _BlockingInputThread(lock)
+    blockingInputThread.start()
+    while RUNNING:
+        with lock:
+            engine.specific_rpm(4000)
+        time.sleep(0.02)
+
+def main():
+    """Main function"""
+    p1 = Process(target=game_engine_processor)
+    p1.start()
+    #p2 = Process(target=engine_sound_processor)
+    #p2.start()
 
 
 if __name__ == "__main__":

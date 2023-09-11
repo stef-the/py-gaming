@@ -10,6 +10,7 @@ python -m arcade.examples.sprite_move_scrolling
 import random
 import arcade
 import math
+import time
 from pyglet.math import Vec2
 
 SPRITE_SCALING = 0.5
@@ -27,7 +28,6 @@ CAMERA_SPEED = 0.1
 
 # How fast the character moves
 PLAYER_MOVEMENT_SPEED = 7
-
 
 class MyGame(arcade.Window):
     """ Main application class. """
@@ -55,6 +55,8 @@ class MyGame(arcade.Window):
         self.down_pressed = False
         self.shift_up_pressed = False
         self.shift_down_pressed = False
+
+        self.timers = [time.time() for x in range(2)]
 
         # Create the cameras. One for the GUI, one for the sprites.
         # We scroll the 'sprite world' but not the GUI.
@@ -130,7 +132,8 @@ class MyGame(arcade.Window):
             f"Throttle: {self.player_sprite.throttle} | " \
             f"Brake: {self.player_sprite.brake} | " \
             f"Angle: {self.player_sprite.angle:5.1f} | " \
-            f"Steering: {self.player_sprite.steering}"
+            f"Steering: {self.player_sprite.steering} | " \
+            f"Rev: {(self.player_sprite.speed / (self.player_sprite.gear * (1.9 - self.player_sprite.gear * 0.05))) if self.player_sprite.gear != 0 else 0}"
 
         arcade.draw_text(text, 10, 10, arcade.color.BLACK, 20)
 
@@ -191,12 +194,13 @@ class MyGame(arcade.Window):
         else:
             self.player_sprite.steering = 0
 
-        # Update speed and angle based on throttle, brake and steering
+        # Update speed and angle based on throttle, brake, steering and gear
         self.player_sprite.angle += (self.player_sprite.steering / (self.player_sprite.speed/3 if self.player_sprite.speed/3 > 1 else 1/3)) if self.player_sprite.speed > 0.5 else self.player_sprite.steering * self.player_sprite.speed * 7
-        self.player_sprite.speed += self.player_sprite.throttle * (1/15)
+        self.player_sprite.speed += (self.player_sprite.throttle * (1/(30 * self.player_sprite.gear if self.player_sprite.gear != 0 else 1)) * 1 if self.player_sprite.gear > 0 else -1 if self.player_sprite.gear < 0 else 0) if self.player_sprite.speed < self.player_sprite.gear * (1.9 - self.player_sprite.gear * 0.05) else 0
+        self.player_sprite.speed *= 1 - self.player_sprite.gear * 0.00001
         self.player_sprite.speed -= (self.player_sprite.brake * 1/14) if self.player_sprite.speed > 1/9 else self.player_sprite.speed if self.player_sprite.brake > 0 else 0
-        self.player_sprite.speed *= 0.99
-        
+        if not self.player_sprite.throttle: self.player_sprite.speed *= 0.99
+
         # Update player based on speed and angle
         self.player_sprite.change_x = (PLAYER_MOVEMENT_SPEED * self.player_sprite.speed) * math.cos(math.radians(self.player_sprite.angle))
         self.player_sprite.change_y = (PLAYER_MOVEMENT_SPEED * self.player_sprite.speed) * math.sin(math.radians(self.player_sprite.angle))

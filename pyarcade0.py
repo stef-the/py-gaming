@@ -29,8 +29,9 @@ CAMERA_SPEED = 0.1
 # How fast the character moves
 PLAYER_MOVEMENT_SPEED = 7
 
+
 class MyGame(arcade.Window):
-    """ Main application class. """
+    """Main application class."""
 
     def __init__(self, width, height, title):
         """
@@ -63,17 +64,15 @@ class MyGame(arcade.Window):
         self.camera_sprites = arcade.Camera(DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT)
         self.camera_gui = arcade.Camera(DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT)
 
-
     def setup(self):
-        """ Set up the game and initialize the variables. """
+        """Set up the game and initialize the variables."""
 
         # Sprite lists
         self.player_list = arcade.SpriteList()
         self.wall_list = arcade.SpriteList()
 
         # Set up the player
-        self.player_sprite = arcade.Sprite("img/red_car/straight.png",
-                                           scale=0.4)
+        self.player_sprite = arcade.Sprite("img/red_car/straight.png", scale=0.4)
         self.player_sprite.center_x = 256
         self.player_sprite.center_y = 512
 
@@ -94,18 +93,22 @@ class MyGame(arcade.Window):
             for y in range(0, 1600, 64):
                 # Randomly skip a box so the player can find a way through
                 if random.randrange(5) > 0:
-                    wall = arcade.Sprite(":resources:images/tiles/grassCenter.png", SPRITE_SCALING)
+                    wall = arcade.Sprite(
+                        ":resources:images/tiles/grassCenter.png", SPRITE_SCALING
+                    )
                     wall.center_x = x
                     wall.center_y = y
                     self.wall_list.append(wall)
 
-        self.physics_engine = arcade.PhysicsEngineSimple(self.player_sprite, self.wall_list)
+        self.physics_engine = arcade.PhysicsEngineSimple(
+            self.player_sprite, self.wall_list
+        )
 
         # Set the background color
         arcade.set_background_color(arcade.color.AMAZON)
 
     def on_draw(self):
-        """ Render the screen. """
+        """Render the screen."""
 
         # This command has to happen before we start drawing
         self.clear()
@@ -121,24 +124,24 @@ class MyGame(arcade.Window):
         self.camera_gui.use()
 
         # Draw the GUI
-        arcade.draw_rectangle_filled(self.width // 2,
-                                     20,
-                                     self.width,
-                                     40,
-                                     arcade.color.GRAY)
-        text = f"Coords: ({self.camera_sprites.position[0]:5.1f}, {self.camera_sprites.position[1]:5.1f}) | " \
-            f"Speed: {self.player_sprite.speed:5.1f} | " \
-            f"Gear: {self.player_sprite.gear if self.player_sprite.gear > 0 else 'N' if self.player_sprite.gear == 0 else f'R{abs(self.player_sprite.gear)}'} | " \
-            f"Throttle: {self.player_sprite.throttle} | " \
-            f"Brake: {self.player_sprite.brake} | " \
-            f"Angle: {self.player_sprite.angle:5.1f} | " \
-            f"Steering: {self.player_sprite.steering} | " \
+        arcade.draw_rectangle_filled(
+            self.width // 2, 20, self.width, 40, arcade.color.GRAY
+        )
+        text = (
+            f"Coords: ({self.camera_sprites.position[0]:5.1f}, {self.camera_sprites.position[1]:5.1f}) | "
+            f"Speed: {self.player_sprite.speed:5.1f} | "
+            f"Gear: {self.player_sprite.gear if self.player_sprite.gear > 0 else 'N' if self.player_sprite.gear == 0 else f'R{abs(self.player_sprite.gear)}'} | "
+            f"Throttle: {self.player_sprite.throttle} | "
+            f"Brake: {self.player_sprite.brake} | "
+            f"Angle: {self.player_sprite.angle:5.1f} | "
+            f"Steering: {self.player_sprite.steering} | "
             f"Rev: {(self.player_sprite.speed / (self.player_sprite.gear * (1.9 - self.player_sprite.gear * 0.05))) if self.player_sprite.gear != 0 else 0}"
+        )
 
         arcade.draw_text(text, 10, 10, arcade.color.BLACK, 20)
 
     def on_key_press(self, key, modifiers):
-        """Called whenever a key is pressed. """
+        """Called whenever a key is pressed."""
 
         if key == arcade.key.UP or key == arcade.key.W:
             self.up_pressed = True
@@ -156,7 +159,7 @@ class MyGame(arcade.Window):
             self.player_sprite.gear += 1
 
     def on_key_release(self, key, modifiers):
-        """Called when the user releases a key. """
+        """Called when the user releases a key."""
 
         if key == arcade.key.UP or key == arcade.key.W:
             self.up_pressed = False
@@ -172,7 +175,7 @@ class MyGame(arcade.Window):
             self.shift_up_pressed = False
 
     def on_update(self, delta_time):
-        """ Movement and game logic """
+        """Movement and game logic"""
 
         # Throttle input
         if self.up_pressed:
@@ -195,21 +198,76 @@ class MyGame(arcade.Window):
             self.player_sprite.steering = 0
 
         # Update speed and angle based on throttle, brake, steering and gear
-        self.player_sprite.angle += (self.player_sprite.steering / (self.player_sprite.speed/3 if self.player_sprite.speed/3 > 1 else 1/3)) if self.player_sprite.speed > 0.5 else self.player_sprite.steering * self.player_sprite.speed * 7
-        self.player_sprite.speed += (self.player_sprite.throttle * (1/(30 * self.player_sprite.gear if self.player_sprite.gear != 0 else 1)) * 1 if self.player_sprite.gear > 0 else -1 if self.player_sprite.gear < 0 else 0) if self.player_sprite.speed < self.player_sprite.gear * (1.9 - self.player_sprite.gear * 0.05) else 0
-        self.player_sprite.speed *= 1 - self.player_sprite.gear * 0.00001
-        self.player_sprite.speed -= (self.player_sprite.brake * 1/14) if self.player_sprite.speed > 1/9 else self.player_sprite.speed if self.player_sprite.brake > 0 else 0
-        if not self.player_sprite.throttle: self.player_sprite.speed *= 0.99
+        # Update steering
+        self.player_sprite.angle += (
+            (
+                self.player_sprite.steering
+                / (
+                    self.player_sprite.speed / 3
+                    if self.player_sprite.speed / 3 > 1
+                    else 1 / 3
+                )
+            )
+            if self.player_sprite.speed > 0.5
+            else self.player_sprite.steering * self.player_sprite.speed * 7
+        )
+
+        # Update speed based on throttle & gear
+        self.player_sprite.speed += (
+            (
+                self.player_sprite.throttle
+                * (
+                    1
+                    / (
+                        30 * self.player_sprite.gear
+                        if self.player_sprite.gear != 0
+                        else 1
+                    )
+                )
+                * 1
+                if self.player_sprite.gear > 0
+                else self.player_sprite.gear
+            )
+            if abs(self.player_sprite.speed)
+            < abs(self.player_sprite.gear) * (1.9 - abs(self.player_sprite.gear) * 0.05)
+            else 0
+        )
+
+        # Update speed based on gear (removing acceleration at higher gears)
+        self.player_sprite.speed *= 1 - self.player_sprite.gear * 0.000008
+        self.player_sprite.speed -= (
+            (self.player_sprite.brake * 1 / 14)
+            if self.player_sprite.speed > 1 / 9
+            else self.player_sprite.speed
+            if self.player_sprite.brake > 0
+            else 0
+        )
+        if self.player_sprite.throttle < 1:
+            self.player_sprite.speed *= 0.995
 
         # Update player based on speed and angle
-        self.player_sprite.change_x = (PLAYER_MOVEMENT_SPEED * self.player_sprite.speed) * math.cos(math.radians(self.player_sprite.angle))
-        self.player_sprite.change_y = (PLAYER_MOVEMENT_SPEED * self.player_sprite.speed) * math.sin(math.radians(self.player_sprite.angle))
+        self.player_sprite.change_x = (
+            PLAYER_MOVEMENT_SPEED * self.player_sprite.speed
+        ) * math.cos(math.radians(self.player_sprite.angle))
+        self.player_sprite.change_y = (
+            PLAYER_MOVEMENT_SPEED * self.player_sprite.speed
+        ) * math.sin(math.radians(self.player_sprite.angle))
         self.position = arcade.rotate_point(
-            self.player_sprite.center_x, self.player_sprite.center_y,
-            self.player_sprite.center_x, self.player_sprite.center_y, self.player_sprite.angle)
-        
+            self.player_sprite.center_x,
+            self.player_sprite.center_y,
+            self.player_sprite.center_x,
+            self.player_sprite.center_y,
+            self.player_sprite.angle,
+        )
+
         # Update angle to keep within bounds
-        self.player_sprite.angle += -360 if self.player_sprite.angle > 360 else +360 if self.player_sprite.angle < 0 else 0
+        self.player_sprite.angle += (
+            -360
+            if self.player_sprite.angle > 360
+            else +360
+            if self.player_sprite.angle < 0
+            else 0
+        )
 
         # Call update on all sprites (The sprites don't do much in this
         # example though.)
@@ -225,8 +283,10 @@ class MyGame(arcade.Window):
         Anything between 0 and 1 will have the camera move to the location with a smoother
         pan.
         """
-        position = Vec2(self.player_sprite.center_x - self.width / 2,
-                        self.player_sprite.center_y - self.height / 2)
+        position = Vec2(
+            self.player_sprite.center_x - self.width / 2,
+            self.player_sprite.center_y - self.height / 2,
+        )
         self.camera_sprites.move_to(position, CAMERA_SPEED)
 
     def on_resize(self, width, height):
@@ -238,11 +298,13 @@ class MyGame(arcade.Window):
         self.camera_sprites.resize(int(width), int(height))
         self.camera_gui.resize(int(width), int(height))
 
+
 def main():
-    """ Main function """
+    """Main function"""
     window = MyGame(DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT, SCREEN_TITLE)
     window.setup()
     arcade.run()
+
 
 if __name__ == "__main__":
     main()

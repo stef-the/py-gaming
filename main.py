@@ -137,12 +137,26 @@ class MyGame(arcade.Window):
         # Set the background color
         arcade.set_background_color(arcade.color.AMAZON)
 
-        self.engine = engine_sound_sim.engine_factory.formula_one_test()
-        print('engine sound processor on')
+        # Create engine sound engine
+        self.engine = engine_sound_sim.engine_factory.formula_one()
+        # self.engine = engine_sound_sim.engine_factory.v_four_90_deg()
+        # self.engine = engine_sound_sim.engine_factory.w_16()
+        # self.engine = engine_sound_sim.engine_factory.v_8_LS()
+        # self.engine = engine_sound_sim.engine_factory.inline_5_crossplane()
+        # self.engine = engine_sound_sim.engine_factory.inline_6()
+        # self.engine = engine_sound_sim.engine_factory.boxer_4_crossplane_custom([1, 1, 0, 0])  # (rando := random.randrange(360)))
+        # self.engine = engine_sound_sim.engine_factory.inline_4_1_spark_plug_disconnected()
+        # self.engine = engine_sound_sim.engine_factory.inline_4()
+        # self.engine = engine_sound_sim.engine_factory.boxer_4_half()
+        # self.engine = engine_sound_sim.engine_factory.random()
+        # self.engine = engine_sound_sim.engine_factory.fake_rotary_2rotor()
+        # self.engine = engine_sound_sim.engine_factory.V_12()
+
         self.lock = threading.Lock()
         self.blockingInputThread = _BlockingInputThread(self.lock)
         self.blockingInputThread.start()
 
+        # Connect engine to audio device
         self.audio_device = AudioDevice()
         self.stream = self.audio_device.play_stream(self.engine.gen_audio)
 

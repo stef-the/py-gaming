@@ -76,26 +76,15 @@ def inline_6():
         between_fire_snd=synth.silence(1)
     )
 
-def formula_one_test():
-    return Engine(
-        idle_rpm=800,
-        limiter_rpm=7800,
-        strokes=4,
-        cylinders=6,
-        timing=[120, 120, 120, 120, 120, 120],
-        fire_snd=_fire_snd,
-        between_fire_snd=synth.silence(1)
-    )
-
 def formula_one():
     return Engine(
-        idle_rpm=800,
-        limiter_rpm=7800,
+        idle_rpm=750,
+        limiter_rpm=15000,
         strokes=4,
         cylinders=6,
-        timing=[120, 120, 120, 120, 120, 120],
+        timing=[120]*6,
         fire_snd=_fire_snd,
-        between_fire_snd=synth.silence(1)
+        between_fire_snd=synth.silence(3)
     )
 
 def v_8_LR():

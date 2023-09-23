@@ -1,10 +1,5 @@
 """
-Scroll around a large screen.
-
-Artwork from https://kenney.nl
-
-If Python and Arcade are installed, this example can be run from the command line with:
-python -m arcade.examples.sprite_move_scrolling
+Origin from pyarcade examples, scroll around screen
 """
 
 import random
@@ -37,6 +32,11 @@ BASE_REVS = 750
 REVS = 0
 RUNNING = True
 
+# 1 block is 64*64 pixels
+blocks = [
+    (0,0),
+    (64,64)
+]
 class _BlockingInputThread(threading.Thread):
     '''
     The `inputs` library's IO is blocking, which means a new thread is needed to wait for
@@ -103,8 +103,8 @@ class MyGame(arcade.Window):
 
         # Set up the player
         self.player_sprite = arcade.Sprite("./img/red_car/straight.png", scale=0.4)
-        self.player_sprite.center_x = 256
-        self.player_sprite.center_y = 512
+        self.player_sprite.center_x = 0
+        self.player_sprite.center_y = 0
 
         # Primary variables (interacting with the player)
         self.player_sprite.throttle = 0
@@ -119,8 +119,9 @@ class MyGame(arcade.Window):
         self.player_list.append(self.player_sprite)
 
         # -- Set up several columns of walls
-        for x in range(200, 1650, 210):
-            for y in range(0, 1600, 64):
+        '''
+        for x in range(200, 5000, 210):
+            for y in range(0, 5000, 64):
                 # Randomly skip a box so the player can find a way through
                 if random.randrange(5) > 0:
                     wall = arcade.Sprite(
@@ -129,6 +130,14 @@ class MyGame(arcade.Window):
                     wall.center_x = x
                     wall.center_y = y
                     self.wall_list.append(wall)
+        '''
+        for i in blocks:
+            wall = arcade.Sprite(
+                ":resources:images/tiles/grassCenter.png", SPRITE_SCALING
+            )
+            wall.center_x = i[0]
+            wall.center_y = i[1]
+            self.wall_list.append(wall)
 
         self.physics_engine = arcade.PhysicsEngineSimple(
             self.player_sprite, self.wall_list
@@ -298,6 +307,7 @@ class MyGame(arcade.Window):
             < abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1)
             else 0
         )
+        
         if abs(self.player_sprite.speed) > abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1):
             self.player_sprite.speed -= abs(self.player_sprite.speed) - abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1) + 0.03
 
@@ -341,6 +351,10 @@ class MyGame(arcade.Window):
             else 0
         )
 
+        # Check for collision
+        if arcade.check_for_collision_with_list(self.player_sprite, self.wall_list):
+            self.player_sprite.speed = 0
+
         # Call update on all sprites (The sprites don't do much in this
         # example though.)
         self.physics_engine.update()
@@ -376,24 +390,12 @@ def game_engine_processor():
     window.setup()
     arcade.run()
 
-def engine_sound_processor():
-    engine = engine_sound_sim.engine_factory.formula_one_test()
-    print('engine sound processor on')
-    lock = threading.Lock()
-    blockingInputThread = _BlockingInputThread(lock)
-    blockingInputThread.start()
-    while RUNNING:
-        with lock:
-            engine.specific_rpm(4000)
-        time.sleep(0.02)
-
 def main():
     """Main function"""
-    p1 = Process(target=game_engine_processor)
+    p1 = Process(target=game_engine_processor) 
     p1.start()
-    #p2 = Process(target=engine_sound_processor)
-    #p2.start()
-
+    # Might incorporate multithreading later
+    # For now it's leftover from implementing engine sounds
 
 if __name__ == "__main__":
     main()

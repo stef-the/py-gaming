@@ -26,10 +26,12 @@ VIEWPORT_MARGIN = 300
 # How fast the camera pans to the player. 1.0 is instant.
 CAMERA_SPEED = 0.3
 
-# How fast the character moves
-PLAYER_MOVEMENT_SPEED = 7
-BASE_REVS = 750
-REVS = 0
+# How fast the car moves
+BASE_RPM = 750
+STEERING_COEF = 550
+BRAKE_SPEED = 0.2
+POWER_MAX = 40
+    # POWER_MAX = 40 Top speed is 35 (with 0.9993 resistance) -> 315km/h
 RUNNING = True
 
 # 1 block is 64*64 pixels
@@ -90,6 +92,7 @@ class MyGame(arcade.Window):
         self.camera_sprites = arcade.Camera(DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT)
         self.camera_gui = arcade.Camera(DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT)
 
+        # Create sound management variables
         self.engine = None
         self.lock = None
         self.blockingInputThread = None
@@ -106,20 +109,26 @@ class MyGame(arcade.Window):
         self.player_sprite.center_x = 0
         self.player_sprite.center_y = 0
 
-        # Primary variables (interacting with the player)
+        # T1 (interacting with the player)
         self.player_sprite.throttle = 0
         self.player_sprite.brake = 0
         self.player_sprite.steering = 0
         self.player_sprite.gear = 0
 
-        # Secondary variables (interacting with the physics engine)
+        # T2 variables (engine)
+        self.player_sprite.power = 0
+        self.player_sprite.torque = 0
+
+        # T3 variables (connecting engine to physics and sound)
+        self.player_sprite.rpm = 750
+
+        # T4 variables (interacting with the physics engine)
         self.player_sprite.angle = 0
         self.player_sprite.speed = 0
 
         self.player_list.append(self.player_sprite)
 
         # -- Set up several columns of walls
-        '''
         for x in range(200, 5000, 210):
             for y in range(0, 5000, 64):
                 # Randomly skip a box so the player can find a way through
@@ -130,7 +139,7 @@ class MyGame(arcade.Window):
                     wall.center_x = x
                     wall.center_y = y
                     self.wall_list.append(wall)
-        '''
+        
         for i in blocks:
             wall = arcade.Sprite(
                 ":resources:images/tiles/grassCenter.png", SPRITE_SCALING
@@ -191,13 +200,13 @@ class MyGame(arcade.Window):
         )
         text = (
             f"Coords: ({self.camera_sprites.position[0]:5.1f}, {self.camera_sprites.position[1]:5.1f}) | "
-            f"Speed: {self.player_sprite.speed:5.1f} | "
+            f"Speed: {self.player_sprite.speed*9:5.1f}km/h | "
             f"Gear: {self.player_sprite.gear if self.player_sprite.gear > 0 else 'N' if self.player_sprite.gear == 0 else f'R{abs(self.player_sprite.gear)}'} | "
-            f"Throttle: {self.player_sprite.throttle} | "
-            f"Brake: {self.player_sprite.brake} | "
-            f"Angle: {self.player_sprite.angle:5.1f} | "
-            f"Steering: {self.player_sprite.steering} | "
-            f"RPM: {round((self.player_sprite.speed / (abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1))) if self.player_sprite.gear != 0 else self.player_sprite.throttle, 3) * 14250 + 750}"
+            #f"Throttle: {self.player_sprite.throttle} | "
+            #f"Brake: {self.player_sprite.brake} | "
+            #f"Angle: {self.player_sprite.angle:5.1f} | "
+            #f"Steering: {self.player_sprite.steering} | "
+            f"RPM: {abs(self.player_sprite.rpm):0.0f}"
         )
 
         arcade.draw_text(text, 10, 10, arcade.color.BLACK, 20)
@@ -215,10 +224,10 @@ class MyGame(arcade.Window):
             self.right_pressed = True
         elif key == arcade.key.Q:
             self.shift_down_pressed = True
-            self.player_sprite.gear -= 1
+            self.player_sprite.gear -= 1 if self.player_sprite.gear > 0 or self.player_sprite.speed < 0.5 and self.player_sprite.gear > -1 else 0
         elif key == arcade.key.E:
             self.shift_up_pressed = True
-            self.player_sprite.gear += 1
+            self.player_sprite.gear += 1 if self.player_sprite.gear < 0 or self.player_sprite.speed > -0.5 and self.player_sprite.gear < 7 else 0
 
     def on_key_release(self, key, modifiers):
         """Called when the user releases a key."""
@@ -240,16 +249,10 @@ class MyGame(arcade.Window):
         """Movement and game logic"""
 
         # Throttle input
-        if self.up_pressed:
-            self.player_sprite.throttle = 1
-        else:
-            self.player_sprite.throttle = 0
+        self.player_sprite.throttle = 1 if self.up_pressed else 0
 
         # Brake input
-        if self.down_pressed:
-            self.player_sprite.brake = 1
-        else:
-            self.player_sprite.brake = 0
+        self.player_sprite.brake = 1 if self.down_pressed else 0
 
         # Steering input
         if self.left_pressed and not self.right_pressed:
@@ -259,80 +262,59 @@ class MyGame(arcade.Window):
         else:
             self.player_sprite.steering = 0
 
-        # Update speed and angle based on throttle, brake, steering and gear
         # Update steering
         self.player_sprite.angle += (
             (
                 self.player_sprite.steering
                 / (
-                    abs(self.player_sprite.speed) / 3
-                    if abs(self.player_sprite.speed) > 1/3
-                    else 1/3
+                    abs(self.player_sprite.speed) / 3 * 40 / STEERING_COEF
                 )
             )
-            if abs(self.player_sprite.speed) > 0.5
-            else self.player_sprite.steering * abs(self.player_sprite.speed) * 7
+            if abs(self.player_sprite.steering * self.player_sprite.speed * 0.8) > 5
+            else self.player_sprite.steering * self.player_sprite.speed * 0.8
         )
 
         # Update sound based on throttle & gear
-        self.engine.specific_rpm(abs(round(
-            ((
-                self.player_sprite.speed
-                / (
-                    abs(self.player_sprite.gear)
-                    * (1.5 + abs(self.player_sprite.gear) * 0.1)
-                )
-            )
-            if self.player_sprite.gear != 0
-            else self.player_sprite.throttle) * 12000 + 750,
-        ) or 750))
+        self.engine.specific_rpm(self.player_sprite.rpm)
 
-        # Update speed based on throttle & gear
-        self.player_sprite.speed += (
-            (
-                self.player_sprite.throttle
-                * (
-                    1
-                    / (
-                        30 * self.player_sprite.gear
-                        if self.player_sprite.gear != 0
-                        else 1
-                    )
-                )
-                * 1
-                if abs(self.player_sprite.gear) > 0
-                else 0
-            )
-            if abs(self.player_sprite.speed)
-            < abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1)
-            else 0
-        )
+        # Update T2 and T3 variables
+        self.player_sprite.torque = POWER_MAX * (1 - (self.player_sprite.gear if self.player_sprite.gear != 0 else 1) / 8)
+        self.player_sprite.power = POWER_MAX * ((self.player_sprite.gear if self.player_sprite.gear != 0 else 1) / 8)
+        if self.player_sprite.gear:
+            self.player_sprite.rpm = self.player_sprite.speed / (self.player_sprite.power+0.000001) * 12500 if abs(self.player_sprite.speed) > 0 else 750
+        else:
+            if self.player_sprite.throttle and self.player_sprite.rpm < 12500:
+                self.player_sprite.rpm += 800 if self.player_sprite.rpm < 12000 else 300 if self.player_sprite.rpm < 13000 else 0
+            if self.player_sprite.rpm >= 750:
+                self.player_sprite.rpm -= 150
+            else:
+                self.player_sprite.rpm = 750
+
+        # Update speed based on torque, power and throttle:
+        if self.player_sprite.throttle and self.player_sprite.gear:
+            self.player_sprite.speed += self.player_sprite.torque * 0.005
         
-        if abs(self.player_sprite.speed) > abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1):
-            self.player_sprite.speed -= abs(self.player_sprite.speed) - abs(self.player_sprite.gear) * (1.5 + abs(self.player_sprite.gear) * 0.1) + 0.03
+        # Update speed based on power limiter
+        if self.player_sprite.speed > self.player_sprite.power and self.player_sprite.gear:
+            self.player_sprite.speed -= (self.player_sprite.speed - self.player_sprite.power) / (3 - self.player_sprite.throttle)
 
-        # Update speed based on gear (removing acceleration at higher gears)
-        self.player_sprite.speed *= 1 - self.player_sprite.gear * 0.000003
-        self.player_sprite.speed -= (
-            (self.player_sprite.brake * 1 / 30)
-            if self.player_sprite.speed > 1 / 9
-            else self.player_sprite.speed
-            if self.player_sprite.brake > 0
-            else 0
-        )
+        # Update speed based on resistance
+        self.player_sprite.speed *= 0.998
 
-        # Add resistance when not throttleing
-        if self.player_sprite.throttle == 0 or abs(self.player_sprite.speed) > abs(
-            self.player_sprite.gear
-        ) * (1.5 + abs(self.player_sprite.gear) * 0.1):
-            self.player_sprite.speed *= 0.995
+        # Update speed based on braking
+        if self.player_sprite.brake:
+            BRAKE_COEF = BRAKE_SPEED if abs(self.player_sprite.speed) > BRAKE_SPEED * 1.1 else abs(self.player_sprite.speed)
+            if self.player_sprite.speed > 0:
+                self.player_sprite.speed -= BRAKE_COEF
+            elif self.player_sprite.speed < 0:
+                self.player_sprite.speed += BRAKE_COEF
 
-        # Update player based on speed and angle
+        # Update player position based on speed and angle
         self.player_sprite.change_x = (
-            PLAYER_MOVEMENT_SPEED * self.player_sprite.speed
+            self.player_sprite.speed
         ) * math.cos(math.radians(self.player_sprite.angle))
         self.player_sprite.change_y = (
-            PLAYER_MOVEMENT_SPEED * self.player_sprite.speed
+            self.player_sprite.speed
         ) * math.sin(math.radians(self.player_sprite.angle))
         self.position = arcade.rotate_point(
             self.player_sprite.center_x,
@@ -342,7 +324,7 @@ class MyGame(arcade.Window):
             self.player_sprite.angle,
         )
 
-        # Update angle to keep within bounds
+        # Update angle to keep within bounds (0-360deg)
         self.player_sprite.angle += (
             -360
             if self.player_sprite.angle > 360
@@ -350,10 +332,6 @@ class MyGame(arcade.Window):
             if self.player_sprite.angle < 0
             else 0
         )
-
-        # Check for collision
-        if arcade.check_for_collision_with_list(self.player_sprite, self.wall_list):
-            self.player_sprite.speed = 0
 
         # Call update on all sprites (The sprites don't do much in this
         # example though.)
